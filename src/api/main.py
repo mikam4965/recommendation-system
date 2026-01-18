@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.api.config import get_api_settings
-from src.api.routes import events, health, recommendations, stats
+from src.api.routes import events, health, recommendations, stats, metrics, experiments
 from src.api.services.recommendation_service import recommendation_service
 
 api_settings = get_api_settings()
@@ -60,6 +60,8 @@ app.include_router(health.router)
 app.include_router(recommendations.router)
 app.include_router(events.router)
 app.include_router(stats.router)
+app.include_router(metrics.router, prefix="/v1")
+app.include_router(experiments.router, prefix="/v1")
 
 
 @app.get("/")
