@@ -174,31 +174,29 @@ class ALSRecommender(BaseRecommender):
 
         user_idx = self._user_to_idx[user_id]
 
-        # Get items to filter out
-        filter_items = None
-        if exclude_seen:
-            seen_items = self._user_items.get(user_id, set())
-            if seen_items:
-                filter_items = [
-                    self._item_to_idx[item_id]
-                    for item_id in seen_items
-                    if item_id in self._item_to_idx
-                ]
+        # Get seen items for filtering
+        seen_items = self._user_items.get(user_id, set()) if exclude_seen else set()
 
-        # Get recommendations
+        # Request more items to account for filtering
+        # Note: filter_already_liked_items has a bug in implicit 0.7.x, so we filter manually
+        n_request = min(n_items + len(seen_items), self.n_items)
+
+        # Get recommendations without built-in filtering
         item_indices, scores = self._model.recommend(
             user_idx,
             self._interaction_matrix.T.tocsr()[user_idx],
-            N=n_items,
-            filter_already_liked_items=exclude_seen,
-            filter_items=filter_items if not exclude_seen else None,
+            N=n_request,
+            filter_already_liked_items=False,
         )
 
-        # Convert back to original IDs
-        recommendations = [
-            (self._idx_to_item[idx], float(score))
-            for idx, score in zip(item_indices, scores)
-        ]
+        # Convert back to original IDs and filter seen items manually
+        recommendations = []
+        for idx, score in zip(item_indices, scores):
+            item_id = self._idx_to_item[idx]
+            if item_id not in seen_items:
+                recommendations.append((item_id, float(score)))
+                if len(recommendations) >= n_items:
+                    break
 
         return recommendations
 
@@ -209,8 +207,6 @@ class ALSRecommender(BaseRecommender):
         exclude_seen: bool = True,
     ) -> dict[int, list[tuple[int, float]]]:
         """Get recommendations for multiple users efficiently.
-
-        Uses implicit library's optimized batch recommendation.
 
         Args:
             user_ids: List of user IDs.
@@ -224,41 +220,9 @@ class ALSRecommender(BaseRecommender):
 
         results = {}
 
-        # Filter to known users
-        known_users = [uid for uid in user_ids if uid in self._user_to_idx]
-        unknown_users = set(user_ids) - set(known_users)
-
-        # Handle unknown users
-        for user_id in unknown_users:
-            results[user_id] = []
-
-        if not known_users:
-            return results
-
-        # Get user indices
-        user_indices = np.array([self._user_to_idx[uid] for uid in known_users])
-
-        # Create user interaction matrix for batch
-        user_items_matrix = self._interaction_matrix.T.tocsr()[user_indices]
-
-        # Get batch recommendations
-        all_item_indices, all_scores = self._model.recommend(
-            user_indices,
-            user_items_matrix,
-            N=n_items,
-            filter_already_liked_items=exclude_seen,
-        )
-
-        # Convert to results
-        for i, user_id in enumerate(known_users):
-            item_indices = all_item_indices[i]
-            scores = all_scores[i]
-
-            recommendations = [
-                (self._idx_to_item[idx], float(score))
-                for idx, score in zip(item_indices, scores)
-            ]
-            results[user_id] = recommendations
+        # Use single-user recommend for each user (workaround for implicit bug)
+        for user_id in user_ids:
+            results[user_id] = self.recommend(user_id, n_items, exclude_seen)
 
         return results
 
