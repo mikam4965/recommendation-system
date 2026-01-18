@@ -22,9 +22,9 @@ class TimeBasedSplitter:
             val_ratio: Ratio of data for validation. Defaults to settings.
             test_ratio: Ratio of data for testing. Defaults to settings.
         """
-        self.train_ratio = train_ratio or settings.train_ratio
-        self.val_ratio = val_ratio or settings.val_ratio
-        self.test_ratio = test_ratio or settings.test_ratio
+        self.train_ratio = train_ratio if train_ratio is not None else settings.train_ratio
+        self.val_ratio = val_ratio if val_ratio is not None else settings.val_ratio
+        self.test_ratio = test_ratio if test_ratio is not None else settings.test_ratio
 
         # Validate ratios sum to 1
         total = self.train_ratio + self.val_ratio + self.test_ratio

@@ -11,13 +11,16 @@ from src.config import settings
 class RetailRocketLoader:
     """Loader for RetailRocket e-commerce dataset."""
 
-    def __init__(self, data_dir: Path | None = None):
+    def __init__(self, data_dir: str | Path | None = None):
         """Initialize loader.
 
         Args:
             data_dir: Path to raw data directory. Defaults to settings.data_raw_dir.
         """
-        self.data_dir = data_dir or settings.data_raw_dir
+        if data_dir is not None:
+            self.data_dir = Path(data_dir)
+        else:
+            self.data_dir = settings.data_raw_dir
 
     def load_events(self) -> pd.DataFrame:
         """Load events.csv file.
